@@ -1,6 +1,7 @@
 #ifndef HTML_H
 #define HTML_H
 
+extern const char *html_nrf24_settings;
 extern const char *html;
 extern const char *html_ota;
 extern const char *html_upload_progress;

@@ -1,228 +1,412 @@
 #include "jam.h"
 
-void VSPI_init() {
-  sp = new SPIClass(VSPI);
-  sp->begin();
-  sp->setFrequency(16000000);
-  sp->setBitOrder(MSBFIRST);
-  sp->setDataMode(SPI_MODE0);
-  radio1.begin(sp);
-  radio1.setAutoAck(false);
-  radio1.stopListening();
-  radio1.setRetries(0, 0);
-  radio1.setPALevel(RF24_PA_MAX, true);
-  radio1.setDataRate(RF24_2MBPS);
-  radio1.setCRCLength(RF24_CRC_DISABLED);
+void InitRadios()
+{
+  for (int i = 0; i < nrf24_count; i++)
+  {
+    radios[i] = new RF24(ce_pins[i], csn_pins[i]);
+  }
 }
-void HSPI_init() {
+void HSPI_init()
+{
   hp = new SPIClass(HSPI);
   hp->begin();
   hp->setFrequency(16000000);
   hp->setBitOrder(MSBFIRST);
   hp->setDataMode(SPI_MODE0);
-  radio.begin(hp);
-  radio.setAutoAck(false);
-  radio.stopListening();
-  radio.setRetries(0, 0);
-  radio.setPALevel(RF24_PA_MAX, true);
-  radio.setDataRate(RF24_2MBPS);
-  radio.setCRCLength(RF24_CRC_DISABLED);
+  for (int i = 0; i < nrf24_count; i++)
+  {
+    radios[i]->begin(hp);
+    radios[i]->setAutoAck(false);
+    radios[i]->stopListening();
+    radios[i]->setRetries(0, 0);
+    radios[i]->setPayloadSize(5);
+    radios[i]->setAddressWidth(3);
+    radios[i]->setPALevel(RF24_PA_MAX, true);
+    radios[i]->setDataRate(RF24_2MBPS);
+    radios[i]->setCRCLength(RF24_CRC_DISABLED);
+  }
 }
-void bluetooth_jam(){
+void bluetooth_jam()
+{
+  InitRadios();
   HSPI_init();
-  VSPI_init();
-  radio.startConstCarrier(RF24_PA_MAX, 45);
-  radio1.startConstCarrier(RF24_PA_MAX, 45);
-  while (true){
-    if (Separate_or_together == 0){
-      if (bluetooth_jam_method == 0){
-        for (int i = 0; i < 22; i++) {
-          radio.setChannel(bluetooth_channels[i]);
-          radio1.setChannel(bluetooth_channels_reversed[i]);
+  for (int j = 0; j < nrf24_count; j++)
+  {
+    radios[j]->startConstCarrier(RF24_PA_MAX, 45);
+  }
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+//    butt1.tick();
+    if (Separate_or_together == 0)
+    {
+      if (bluetooth_jam_method == 0)
+      {
+        int total_channels = 21;
+        int base = total_channels / nrf24_count;
+        int rem = total_channels % nrf24_count;
+        int ch = 0;
+        for (int j = 0; j < nrf24_count; j++) {
+          int count = base + (j < rem ? 1 : 0);
+          for (int i = 0; i < count; i++, ch++) {
+            radios[j]->setChannel(bluetooth_channels[ch]);
+          }
         }
       }
-      if (bluetooth_jam_method == 1){
-        radio.setChannel(random(40));
-        radio1.setChannel(random(40, 80));
-      }
-      if (bluetooth_jam_method == 2){
-        for (int i = 0; i < 80; i++) {
-          radio.setChannel(i);
-          radio1.setChannel(i-79);
-        }
-      }
-    }
-    if (Separate_or_together == 1){
-      if (bluetooth_jam_method == 0){
-        for (int i = 0; i < 22; i++) {
-          radio.setChannel(bluetooth_channels[i]);
-          radio1.setChannel(bluetooth_channels[i]);
-        }
-      }
-      if (bluetooth_jam_method == 1){
+      if (bluetooth_jam_method == 1)
+      {
         int random_channel = random(80);
-        radio.setChannel(random_channel);
-        radio1.setChannel(random_channel);
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(random_channel);
+        }
       }
-      if (bluetooth_jam_method == 2){
-        for (int i = 0; i < 80; i++) {
-          radio.setChannel(i);
-          radio1.setChannel(i);
+      if (bluetooth_jam_method == 2)
+      {
+        int total_channels = 80;
+        int base = total_channels / nrf24_count;
+        int rem = total_channels % nrf24_count;
+        int ch = 0;
+        for (int j = 0; j < nrf24_count; j++) {
+          int count = base + (j < rem ? 1 : 0);
+          for (int i = 0; i < count; i++, ch++) {
+            radios[j]->setChannel(ch);
+          }
+        }
+      }
+    }
+    else
+    {
+      if (bluetooth_jam_method == 0)
+      {
+        for (int ch = 0; ch < 21; ch++)
+        {
+          for (int j = 0; j < nrf24_count; j++)
+          {
+            radios[j]->setChannel(bluetooth_channels[ch]);
+          }
+        }
+      }
+      if (bluetooth_jam_method == 1)
+      {
+        int random_channel = random(80);
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(random_channel);
+        }
+      }
+      if (bluetooth_jam_method == 2)
+      {
+        for (int ch = 0; ch < 80; ch++)
+        {
+          for (int j = 0; j < nrf24_count; j++)
+          {
+            radios[j]->setChannel(ch);
+          }
         }
       }
     }
   }
+//Start code to clean
+  for (int j = 0; j < nrf24_count; j++)
+  {
+    radios[j]->stopConstCarrier();
+  }
+//Start code to clean
 }
-void drone_jam(){
+void drone_jam()
+{
+  InitRadios();
   HSPI_init();
-  VSPI_init();
-  radio.startConstCarrier(RF24_PA_MAX, 45);
-  radio1.startConstCarrier(RF24_PA_MAX, 45);
-  while (true){
-    if (Separate_or_together == 0){
-      if (drone_jam_method == 0){
-        radio.setChannel(random(64));
-        radio1.setChannel(random(64, 125));
-      }
-      if (drone_jam_method == 1){
-        for (int i = 0; i < 125; i++){
-          radio.setChannel(i);
-          radio1.setChannel(i-125);
-        }
-      }
-    }
-    if (Separate_or_together == 1){
-      if (drone_jam_method == 0){
+  for (int j = 0; j < nrf24_count; j++)
+  {
+    radios[j]->startConstCarrier(RF24_PA_MAX, 45);
+  }
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+//    butt1.tick();
+    if (Separate_or_together == 0)
+    {
+      if (drone_jam_method == 0)
+      {
         int random_channel = random(125);
-        radio.setChannel(random_channel);
-        radio1.setChannel(random_channel);
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(random_channel);
+        }
       }
-      if (drone_jam_method == 1){
-        for (int i = 0; i < 125; i++){
-          radio.setChannel(i);
-          radio1.setChannel(i);
+      if (drone_jam_method == 1)
+      {
+        int total_channels = 125;
+        int base = total_channels / nrf24_count;
+        int rem = total_channels % nrf24_count;
+        int ch = 0;
+        for (int j = 0; j < nrf24_count; j++) {
+          int count = base + (j < rem ? 1 : 0);
+          for (int i = 0; i < count; i++, ch++) {
+            radios[j]->setChannel(ch);
+          }
+        }
+      }
+    }
+    else
+    {
+      if (drone_jam_method == 0)
+      {
+        int random_channel = random(125);
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(random_channel);
+        }
+      }
+      if (drone_jam_method == 1)
+      {
+        for (int ch = 0; ch < 125; ch++)
+        {
+          for (int j = 0; j < nrf24_count; j++)
+          {
+            radios[j]->setChannel(ch);
+          }
+        }
+      }
+    }
+  }
+//code to clean
+  for (int j = 0; j < nrf24_count; j++)
+  {
+    radios[j]->stopConstCarrier();
+  }
+//code to clean STOP
+}
+void ble_jam()
+{
+  InitRadios();
+  HSPI_init();
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+//    butt1.tick();
+    if (Separate_or_together == 0)
+    {
+      int total_channels = 3;
+      int base = total_channels / nrf24_count;
+      int rem = total_channels % nrf24_count;
+      int ch = 0;
+      for (int j = 0; j < nrf24_count; j++) {
+        int count = base + (j < rem ? 1 : 0);
+        for (int i = 0; i < count; i++, ch++) {
+          radios[j]->setChannel(ble_channels[ch]);
+          radios[j]->writeFast(&jam_text, sizeof(jam_text));
+        }
+      }
+    }
+    else
+    {
+      for (int ch = 0; ch < 3; ch++)
+      {
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(ble_channels[ch]);
+          radios[j]->writeFast(&jam_text, sizeof(jam_text));
         }
       }
     }
   }
 }
-void ble_jam(){
+void wifi_jam()
+{
+  InitRadios();
   HSPI_init();
-  VSPI_init();
-  while (true){
-    if (Separate_or_together == 0){
-      for (int i = 0; i < 3; i++){
-        radio.setChannel(ble_channels[i]);
-        radio1.setChannel(ble_channels_reversed[i]);
-        radio.writeFast(&jam_text, sizeof(jam_text));
-        radio1.writeFast(&jam_text, sizeof(jam_text));
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+    for (int channel = 0; channel < 13; channel++)
+    {
+      if (Separate_or_together == 0)
+      {
+        int total_channels = 22;
+        int base = total_channels / nrf24_count;
+        int rem = total_channels % nrf24_count;
+        int ch = (channel * 5) + 1;
+        for (int j = 0; j < nrf24_count; j++) {
+          int count = base + (j < rem ? 1 : 0);
+          for (int i = 0; i < count; i++, ch++) {
+            butt1.tick();
+            if (butt1.isSingle())
+              break;
+            radios[j]->setChannel(ch);
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
       }
-    }
-    if (Separate_or_together == 1){
-      for (int i = 0; i < 3; i++){
-        radio.setChannel(ble_channels[i]);
-        radio1.setChannel(ble_channels[i]);
-        radio.writeFast(&jam_text, sizeof(jam_text));
-        radio1.writeFast(&jam_text, sizeof(jam_text));
+      else
+      {
+        for (int ch = (channel * 5) + 1; ch < (channel * 5) + 23; ch++)
+        {
+          for (int j = 0; j < nrf24_count; j++)
+          {
+//            butt1.tick();
+//            if (butt1.isSingle())
+//              break;
+            radios[j]->setChannel(ch);
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
       }
+//code to clean
+      if (butt1.isSingle())
+        break;
+// nd code clean        
     }
   }
 }
-void wifi_jam(){
+void wifi_channel(int channel)
+{
+  InitRadios();
   HSPI_init();
-  VSPI_init();
-  while (true){
-    if (Separate_or_together == 0){
-      for (int channel = 0; channel < 13; channel++) {
-        for (int i = (channel * 5) + 1; i < (channel * 5) + 23; i++) {
-          radio.setChannel(i);
-          radio1.setChannel(83-i);
-          radio.writeFast(&jam_text, sizeof(jam_text));
-          radio1.writeFast(&jam_text, sizeof(jam_text));
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+    if (Separate_or_together == 0)
+    {
+      int total_channels = 22;
+      int base = total_channels / nrf24_count;
+      int rem = total_channels % nrf24_count;
+      int ch = (channel * 5) + 1;
+      for (int j = 0; j < nrf24_count; j++) {
+        int count = base + (j < rem ? 1 : 0);
+        for (int i = 0; i < count; i++, ch++) {
+          butt1.tick();
+          if (butt1.isSingle())
+            break;
+          radios[j]->setChannel(ch);
+          radios[j]->writeFast(&jam_text, sizeof(jam_text));
         }
       }
     }
-    if (Separate_or_together == 1){
-      for (int channel = 0; channel < 13; channel++) {
-        for (int i = (channel * 5) + 1; i < (channel * 5) + 23; i++) {
-          radio.setChannel(i);
-          radio1.setChannel(i);
-          radio.writeFast(&jam_text, sizeof(jam_text));
-          radio1.writeFast(&jam_text, sizeof(jam_text));
-        }
-      }
-    }
-  }
-}
-void wifi_channel(int channel){
-  HSPI_init();
-  VSPI_init();
-  while (true){
-    if (Separate_or_together == 0){
-      for (int i = (channel * 5) + 1; i < (channel * 5) + 23; i++) {
-        radio.setChannel(i);
-        radio1.setChannel((channel * 5 + 23) - (i - (channel * 5)));
-        radio.writeFast(&jam_text, sizeof(jam_text));
-        radio1.writeFast(&jam_text, sizeof(jam_text));
-      }
-    }
-    if (Separate_or_together == 1){
-      for (int i = (channel * 5) + 1; i < (channel * 5) + 23; i++) {
-        radio.setChannel(i);
-        radio1.setChannel(i);
-        radio.writeFast(&jam_text, sizeof(jam_text));
-        radio1.writeFast(&jam_text, sizeof(jam_text));
-      }
-    }
-  }
-}
-void zigbee_jam(){
-  HSPI_init();
-  VSPI_init();
-  while (true){
-    if (Separate_or_together == 0){
-      for (int channel = 11; channel < 27; channel++){
-        for (int i = 5+5*(channel-11); i < (5+5*(channel-11))+6; i++){
-          radio.setChannel(i);
-          radio1.setChannel(85-i);
-          radio.writeFast(&jam_text, sizeof(jam_text));
-          radio1.writeFast(&jam_text, sizeof(jam_text));
-        }
-      }
-    }
-
-    if (Separate_or_together == 1){
-      for (int channel = 11; channel < 27; channel++){
-        for (int i = 5+5*(channel-11); i < (5+5*(channel-11))+6; i++){
-          radio.setChannel(i);
-          radio1.setChannel(i);
-          radio.writeFast(&jam_text, sizeof(jam_text));
-          radio1.writeFast(&jam_text, sizeof(jam_text));
+    else
+    {
+      for (int ch = (channel * 5) + 1; ch < (channel * 5) + 23; ch++)
+      {
+        for (int j = 0; j < nrf24_count; j++)
+        {
+//          butt1.tick();
+//          if (butt1.isSingle())
+//            break;
+          radios[j]->setChannel(ch);
+          radios[j]->writeFast(&jam_text, sizeof(jam_text));
         }
       }
     }
   }
 }
-void misc_jam(int channel1, int channel2){
+void zigbee_jam()
+{
+  InitRadios();
   HSPI_init();
-  VSPI_init();
-  if (misc_jam_method != 1) {
-    radio.startConstCarrier(RF24_PA_MAX, 45);
-    radio1.startConstCarrier(RF24_PA_MAX, 45);
+//  butt1.tick();
+/  while (!butt1.isSingle())
+  while (true)
+  {
+    for (int channel = 11; channel < 27; channel++)
+    {
+      if (Separate_or_together == 0)
+      {
+        int total_channels = 6;
+        int base = total_channels / nrf24_count;
+        int rem = total_channels % nrf24_count;
+        int ch = 5 + 5 * (channel - 11);
+        for (int j = 0; j < nrf24_count; j++) {
+          int count = base + (j < rem ? 1 : 0);
+          for (int i = 0; i < count; i++, ch++) {
+//            butt1.tick();
+//            if (butt1.isSingle())
+//              break;
+            radios[j]->setChannel(ch);
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
+      }
+      else
+      {
+        for (int ch = 5 + 5 * (channel - 11); ch < (5 + 5 * (channel - 11)) + 6; ch++)
+        {
+          for (int j = 0; j < nrf24_count; j++)
+          {
+  //          butt1.tick();
+  //          if (butt1.isSingle())
+  //            break;
+            radios[j]->setChannel(ch);
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
+      }
+// clean code
+      if (butt1.isSingle())
+        break;
+// end clean code        
+    }
   }
-  while (true) {
-    for (int i = 0; i <= channel2 - channel1; i++) {
-      if (Separate_or_together == 0) {
-        radio1.setChannel(channel2 - i);
+}
+void misc_jam(int channel1, int channel2)
+{
+  InitRadios();
+  HSPI_init();
+  if (misc_jam_method != 1){
+    for (int j = 0; j < nrf24_count; j++)
+    {
+      radios[j]->startConstCarrier(RF24_PA_MAX, 45);
+    }
+  }
+//  butt1.tick();
+//  while (!butt1.isSingle())
+  while (true)
+  {
+//    butt1.tick();
+    if (Separate_or_together == 0)
+    {
+      int total_channels = channel2 - channel1 + 1;
+      int base = total_channels / nrf24_count;
+      int rem = total_channels % nrf24_count;
+      int ch = channel1;
+      for (int j = 0; j < nrf24_count; j++) {
+        int count = base + (j < rem ? 1 : 0);
+        for (int i = 0; i < count; i++, ch++) {
+          radios[j]->setChannel(ch);
+          if (misc_jam_method == 1)
+          {
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
       }
-      else if (Separate_or_together == 1) {
-        radio1.setChannel(channel1 + i);
+    }
+    else
+    {
+      for (int ch = channel1; ch <= channel2; ch++)
+      {
+        for (int j = 0; j < nrf24_count; j++)
+        {
+          radios[j]->setChannel(ch);
+          if (misc_jam_method == 1)
+          {
+            radios[j]->writeFast(&jam_text, sizeof(jam_text));
+          }
+        }
       }
-      radio.setChannel(channel1 + i);
-      if (misc_jam_method == 1){
-        radio.writeFast(&jam_text, sizeof(jam_text));
-        radio1.writeFast(&jam_text, sizeof(jam_text));
-      }
+    }
+  }
+  if (misc_jam_method != 1)
+  {
+    for (int j = 0; j < nrf24_count; j++)
+    {
+      radios[j]->stopConstCarrier();
     }
   }
 }
